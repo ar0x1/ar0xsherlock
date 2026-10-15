@@ -39,7 +39,7 @@ Built with Bash and cURL, it combines concurrent HTTP requests with an interacti
 Copy and paste this command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ar0xsherlock/main/ar0xsherlock -o ar0xsherlock && chmod +x ar0xsherlock && ./ar0xsherlock
+curl -fsSL https://raw.githubusercontent.com/ar0x1/arl0x/main/ar0xsherlock -o ar0xsherlock && chmod +x ar0xsherlock && ./ar0xsherlock
 ```
 
 This downloads the script, makes it executable, and launches the tool.
@@ -49,7 +49,7 @@ This downloads the script, makes it executable, and launches the tool.
 ### Manual Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ar0xsherlock.git
+git clone https://github.com/ar0x1/arl0x.git
 cd ar0xsherlock
 chmod +x ar0xsherlock
 ./ar0xsherlock
@@ -118,10 +118,9 @@ Contributions, bug reports, and suggestions are welcome.
 2. Create a feature branch.
 3. Make your changes.
 4. Submit a pull request.
+## ◈ Author
 
-## ◈ License
-
-Add your chosen license and include the corresponding `LICENSE` file in the repository.
+Created by **ar0x** · [GitHub profile](https://github.com/ar0x1) · [Contact](killtoneizuku@gmail.com)
 
 ---
 
