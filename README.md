@@ -1,71 +1,83 @@
 # `ar0xsherlock`
 
 <p align="center">
-  <b>USERNAME RECONNAISSANCE · STRAIGHT FROM YOUR TERMINAL</b>
+  <b>ONE NAME. EVERY SITE. FIND THE PUBLIC TRAIL.</b>
 </p>
 
 <p align="center">
-  A lightweight Bash and cURL tool for discovering public profiles across multiple websites.
+  A terminal-based username OSINT tool built with Bash and cURL.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.1.1-00D4AA?style=flat-square" />
   <img src="https://img.shields.io/badge/Bash-4%2B-121212?style=flat-square&logo=gnubash&logoColor=white" />
-  <img src="https://img.shields.io/badge/Powered%20by-cURL-121212?style=flat-square&logo=curl&logoColor=white" />
+  <img src="https://img.shields.io/badge/cURL-powered-121212?style=flat-square&logo=curl&logoColor=white" />
+  <img src="https://img.shields.io/badge/Platform-Linux-121212?style=flat-square&logo=linux&logoColor=white" />
 </p>
 
 ---
 
+## ◈ About
+
+**ar0xsherlock** is a lightweight username discovery tool that checks public profile URLs across approximately 75 popular websites.
+
+Built entirely with Bash and cURL, it features concurrent scanning, a live terminal grid, profile browsing, and report generation.
+
 ## ◈ Features
 
-- Multi-site username scanning
-- Concurrent HTTP requests
-- Interactive terminal interface
-- Live scan progress and results
-- Lightweight Bash implementation
-- Simple command-line usage
+- **Multi-site scanning** — Check usernames across supported websites.
+- **Live terminal grid** — Follow scan results as they arrive.
+- **Concurrent requests** — Check multiple websites in parallel.
+- **Profile browser** — Open discovered profile links.
+- **Report generation** — Save scan reports to your Downloads directory.
+- **Scan history** — Remember previously searched usernames.
+- **Lightweight** — Bash and cURL, without a heavy framework.
+- **Color-aware UI** — Terminal colors with a `NO_COLOR` fallback.
 
-## ◈ Installation
+## ◈ Quick Start
 
-### Requirements
+### One-command launch
 
-- Linux or a compatible Unix-like system
-- Bash 4+
+
+This downloads the script and launches it directly in Bash without saving a separate script file.
+
+Copy and paste this into your terminal:
+
+### Download and install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlock/main/arr0xsherlock.txt -o ar0xsherlock
+chmod +x ar0xsherlock
+./ar0xsherlock
+```
+
+## ◈ Requirements
+
+- Linux or a compatible Unix-like environment
+- Bash 4 or newer
 - cURL
-- Git
 - Internet connection
+- Interactive terminal
 
-### Quick Start
+Install cURL if needed:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlock/main/ar0xsherlock.txt -o ar0xsherlock
-chmod +x ar0xsherlock
-./ar0xsherlock
-```
-OR
-
-Copy and paste the following commands into your terminal:
+**Debian / Ubuntu / Kali Linux**
 
 ```bash
-git clone https://github.com/ar0x1/ar0xsherlock.git
-cd ar0xsherlock
-ls -la
+sudo apt update && sudo apt install curl
 ```
 
-Make sure the main script is named `ar0xsherlock`. Then run:
+**Fedora**
 
 ```bash
-chmod +x ar0xsherlock
-./ar0xsherlock
+sudo dnf install curl
 ```
 
-If the script is not executable or you prefer to launch it through Bash:
+**Arch Linux**
 
 ```bash
-bash ./ar0xsherlock
+sudo pacman -S curl
 ```
-
-**Important:** If `ls -la` shows a different script filename, use that exact filename in the commands above.
 
 ## ◈ Usage
 
@@ -75,49 +87,72 @@ Launch the interactive interface:
 ./ar0xsherlock
 ```
 
-Search for a username:
+Start with a username already entered:
 
 ```bash
 ./ar0xsherlock username
 ```
 
-Display help:
+Show help:
 
 ```bash
 ./ar0xsherlock --help
 ```
 
-Display version:
+Show version:
 
 ```bash
 ./ar0xsherlock --version
 ```
 
-Replace `username` with the handle you want to check.
+Usernames must be 2–32 characters and may contain letters, numbers, dots, underscores, and hyphens.
+
+## ◈ Terminal Controls
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` or `j` / `k` | Navigate results |
+| `Enter` / `o` | Open the selected profile |
+| `g` | Open the scan grid |
+| `s` | Save a report |
+| `n` | Search another username |
+| `q` | Quit or return |
 
 ## ◈ How It Works
 
-1. Accepts a username as input.
-2. Checks supported websites using HTTP requests.
-3. Processes the responses.
-4. Displays potential public-profile matches in the terminal.
+1. Enter a username.
+2. The tool checks supported profile URLs using cURL.
+3. Requests run concurrently, with a timeout for individual checks.
+4. Results are displayed in the terminal grid.
+5. Browse discovered profiles or save a report.
 
-Website changes, rate limits, redirects, and network failures can affect detection accuracy.
+A website marked as blocked or returning an unexpected response does not necessarily mean the profile is absent.
+
+## ◈ Limitations
+
+- Some websites block automated requests.
+- Rate limits, redirects, and network issues can affect results.
+- A detected profile does not prove that it belongs to a particular person.
+- Results should be independently verified.
 
 ## ◈ Responsible Use
 
-Use `ar0xsherlock` for legitimate OSINT and public-profile research. Respect website terms, applicable laws, and individual privacy. Do not use discovered information to harass or harm others.
+Use this tool for legitimate OSINT and public-profile research. Respect website terms of service, privacy, and applicable laws. Do not use the results to harass, impersonate, or harm others.
 
 ## ◈ Disclaimer
 
-This project is provided for educational and legitimate research purposes. Results are indicators, not guaranteed proof of identity. Use the tool responsibly.
+This project is provided for educational and legitimate research purposes. Use it responsibly and verify important findings independently.
 
-## ◈ Contributing
-
-Bug reports, suggestions, and pull requests are welcome.
 ## ◈ Author
 
-Created by **ar0x** · [GitHub profile](https://github.com/ar0x1) · [Contact](killtoneizuku@gmail.com)
+**ar0x**
+
+- GitHub: [@ar0x1](https://github.com/ar0x1)
+- Contact: `killtoneizuku@gmail.com`
+
+## ◈ License
+
+Refer to the repository's license file, if provided.
 
 ---
 
