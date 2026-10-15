@@ -1,0 +1,811 @@
+#!/usr/bin/env bash
+#================================================================
+#  ar0x sherlock v1.1.1 — find a username across the social web
+#  a legendary little terminal app built on curl.
+#
+#  usage:   ar0xsherlock                interactive (recommended)
+#           ar0xsherlock someuser       start with a name prefilled
+#
+#  new in 1.1  · THE GRID — every site shown live during the hunt
+#                (✓ found · ✗ blocked · – miss · ○ in flight), and a
+#                full scrollable sweep grid on the results screen (g)
+#  fix in 1.1.1 · grid state rebuilt without associative arrays —
+#                kills the "GSTAT: unbound variable" crash on
+#                bash 4.2/4.3
+#
+#  needs:   bash 4+ and curl — both ship with every distro.
+#
+#  honest note: ~75 popular sites are checked in parallel.
+#  sites behind hard bot-walls (facebook, x, instagram,
+#  linkedin) are not included — results marked 'blocked'
+#  mean the site answered strangely, not that it's absent.
+#
+#  crafted by ar0x · killtoneizuku@gmail.com
+#  github.com/ar0x1
+#================================================================
+set -u
+
+VERSION="1.1.1"
+AX_DIR="$HOME/.config/ar0xsherlock"
+AX_HISTORY="$AX_DIR/history"
+FIRSTDRAW=1
+SCR=()
+CURSOR=""
+KEY=''
+
+UNAME=''
+LAST_USER=''
+RESF=''
+TOTAL=0
+INTR=0
+SCANNING=0
+
+# grid state: two parallel indexed arrays (safe under set -u)
+GORDER=()   # site names in display order
+GST=()      # matching statuses: FOUND / NO / ERR / P (in flight)
+GCOLS=1
+
+UA="Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"
+TMO=10
+MAXJ=12
+
+# ---------- palette: black + crystal blue-green ----------
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+  RST=$'\e[0m' B=$'\e[1m' D=$'\e[2m'
+  AQUA=$'\e[38;5;51m' TEAL=$'\e[38;5;80m' INK=$'\e[38;5;255m'
+  GRAY=$'\e[38;5;247m' DG=$'\e[38;5;241m' RED=$'\e[38;5;203m'
+  G1=$'\e[38;5;51m' G2=$'\e[38;5;50m' G3=$'\e[38;5;49m'
+  G4=$'\e[38;5;44m' G5=$'\e[38;5;43m' G6=$'\e[38;5;38m'
+else
+  RST='' B='' D='' AQUA='' TEAL='' INK='' GRAY='' DG='' RED=''
+  G1='' G2='' G3='' G4='' G5='' G6=''
+fi
+
+# ---------- glyphs ----------
+UTF8=0
+[ "$(locale charmap 2>/dev/null)" = "UTF-8" ] && UTF8=1
+if [ "$UTF8" -eq 1 ]; then
+  GTL='╭' GTR='╮' GBL='╰' GBR='╯' GDL='├' GDR='┤' GH='─' GV='│'
+  DIA='◆' DOT='·' DASH='—' ARR='↳' TRI='▸' XGL='✗' ELL='…' BARF='█' BARE='░'
+  GF='✓' GM='–' GP='○'
+  SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  ART=(
+    '  ███   ██████   █████  █     █'
+    ' █   █  █     █ █     █  █   █ '
+    '█     █ █     █ █     █   █ █  '
+    '███████ ██████  █     █   █ █  '
+    '█     █ █   ██  █     █  █   █ '
+    '█     █ █    █   █████  █     █'
+  )
+else
+  GTL='+' GTR='+' GBL='+' GBR='+' GDL='+' GDR='+' GH='-' GV='|'
+  DIA='*' DOT='-' DASH='-' ARR='>' TRI='>' XGL='x' ELL='..' BARF='#' BARE='.'
+  GF='+' GM='-' GP='o'
+  SPIN=('|' '/' '-' '\')
+fi
+
+# ---------- sizing ----------
+COLS=$(tput cols 2>/dev/null || echo 80)
+case "$COLS" in ''|*[!0-9]*) COLS=80;; esac
+[ "$COLS" -gt 78 ] && COLS=78
+[ "$COLS" -lt 50 ] && COLS=50
+LINES=$(tput lines 2>/dev/null || echo 24)
+case "$LINES" in ''|*[!0-9]*) LINES=24;; esac
+BARW=$((COLS-10)); [ "$BARW" -gt 40 ] && BARW=40
+BSTATE=0
+AART=0; SART=0
+[ "$UTF8" -eq 1 ] && [ "$LINES" -ge 26 ] && AART=1
+[ "$UTF8" -eq 1 ] && [ "$LINES" -ge 34 ] && [ "$COLS" -ge 65 ] && SART=1
+
+# ---------- the hunt list: name|url|mode|param ----------
+# C = http 200 means found, 404 means absent · T = error text means absent
+SITES=(
+ 'GitHub|https://github.com/{u}|C|'
+ 'GitLab|https://gitlab.com/{u}|C|'
+ 'Reddit|https://www.reddit.com/user/{u}/|C|'
+ 'YouTube|https://www.youtube.com/{u}|C|'
+ 'TikTok|https://www.tiktok.com/@{u}|C|'
+ 'Twitch|https://www.twitch.tv/{u}|C|'
+ 'Pinterest|https://www.pinterest.com/{u}/|C|'
+ 'Medium|https://medium.com/@{u}|C|'
+ 'Keybase|https://keybase.io/{u}|C|'
+ 'Gravatar|https://gravatar.com/{u}|C|'
+ 'Imgur|https://imgur.com/user/{u}|C|'
+ '9GAG|https://9gag.com/u/{u}|C|'
+ 'BuzzFeed|https://www.buzzfeed.com/{u}|C|'
+ 'VSCO|https://vsco.co/{u}/gallery|C|'
+ 'Ello|https://ello.co/{u}|C|'
+ 'Tumblr|https://{u}.tumblr.com|C|'
+ 'Blogger|https://{u}.blogspot.com|C|'
+ 'WordPress|https://{u}.wordpress.com|T|do you want to register'
+ 'SoundCloud|https://soundcloud.com/{u}|C|'
+ 'Bandcamp|https://bandcamp.com/{u}|C|'
+ 'Mixcloud|https://www.mixcloud.com/{u}/|C|'
+ 'Audiomack|https://audiomack.com/{u}|C|'
+ 'Last.fm|https://www.last.fm/user/{u}|C|'
+ 'Genius|https://genius.com/{u}|C|'
+ 'Vimeo|https://vimeo.com/{u}|C|'
+ 'Rumble|https://rumble.com/user/{u}|C|'
+ 'Odysee|https://odysee.com/@{u}|C|'
+ 'BitChute|https://www.bitchute.com/channel/{u}/|C|'
+ 'DeviantArt|https://www.deviantart.com/{u}|C|'
+ 'Behance|https://www.behance.net/{u}|C|'
+ 'Dribbble|https://dribbble.com/{u}|C|'
+ 'ArtStation|https://www.artstation.com/{u}|C|'
+ 'Flickr|https://www.flickr.com/people/{u}|C|'
+ 'Letterboxd|https://letterboxd.com/{u}/|C|'
+ 'Trakt|https://trakt.tv/users/{u}|C|'
+ 'AniList|https://anilist.co/user/{u}/|C|'
+ 'Steam|https://steamcommunity.com/id/{u}|T|the specified profile could not be found'
+ 'Roblox|https://www.roblox.com/user.aspx?username={u}|T|page cannot be found'
+ 'Chess.com|https://www.chess.com/member/{u}|C|'
+ 'Lichess|https://lichess.org/@/{u}|C|'
+ 'Duolingo|https://www.duolingo.com/profile/{u}|C|'
+ 'Goodreads|https://www.goodreads.com/{u}|C|'
+ 'Wattpad|https://www.wattpad.com/user/{u}|C|'
+ 'Etsy|https://www.etsy.com/shop/{u}|C|'
+ 'Redbubble|https://www.redbubble.com/people/{u}/shop|C|'
+ 'Fiverr|https://www.fiverr.com/{u}|C|'
+ 'Gumroad|https://{u}.gumroad.com|C|'
+ 'itch.io|https://{u}.itch.io|C|'
+ 'Newgrounds|https://{u}.newgrounds.com|C|'
+ 'Kongregate|https://www.kongregate.com/accounts/{u}|C|'
+ 'Patreon|https://www.patreon.com/{u}|C|'
+ 'Ko-fi|https://ko-fi.com/{u}|T|page not found'
+ 'BuyMeACoffee|https://buymeacoff.ee/{u}|C|'
+ 'Venmo|https://venmo.com/{u}|C|'
+ 'SlideShare|https://www.slideshare.net/{u}|C|'
+ 'Scribd|https://www.scribd.com/{u}|C|'
+ 'Instructables|https://www.instructables.com/member/{u}/|C|'
+ 'ProductHunt|https://www.producthunt.com/@{u}|C|'
+ 'Docker Hub|https://hub.docker.com/u/{u}|C|'
+ 'npm|https://www.npmjs.com/~{u}|C|'
+ 'PyPI|https://pypi.org/user/{u}/|C|'
+ 'Replit|https://replit.com/@{u}|C|'
+ 'CodePen|https://codepen.io/{u}|C|'
+ 'JSFiddle|https://jsfiddle.net/user/{u}/|C|'
+ 'HackerRank|https://www.hackerrank.com/profile/{u}|C|'
+ 'Codewars|https://www.codewars.com/users/{u}|C|'
+ 'Exercism|https://exercism.org/profiles/{u}|C|'
+ 'LeetCode|https://leetcode.com/u/{u}/|C|'
+ 'Kaggle|https://www.kaggle.com/{u}|C|'
+ 'HackerOne|https://hackerone.com/{u}|C|'
+ 'TryHackMe|https://tryhackme.com/p/{u}|C|'
+ 'HTB Forum|https://forum.hackthebox.com/u/{u}|C|'
+ 'HackerNews|https://news.ycombinator.com/user?id={u}|T|no such user'
+ 'TradingView|https://www.tradingview.com/u/{u}/|C|'
+ 'Sketchfab|https://sketchfab.com/{u}|C|'
+)
+TOTAL=${#SITES[@]}
+
+# ---------- text helpers ----------
+trunc(){ local s=$1 m=$2
+  [ "${#s}" -gt "$m" ] && s="${s:0:$((m-1))}$ELL"
+  printf '%s' "$s"; }
+mmss(){ printf '%02d:%02d' $(( ${1:-0}/60 )) $(( ${1:-0}%60 )); }
+hrule(){ local n=$1 s; printf -v s '%*s' "$n" ''; printf '%s' "${s// /$GH}"; }
+
+# ---------- screen engine: compose -> single-write draw ----------
+scr(){ SCR+=("$1"); }
+scr_cursor(){ CURSOR="$1;$2"; }
+draw(){
+  if [ "$FIRSTDRAW" -eq 1 ]; then printf '\e[2J'; FIRSTDRAW=0; fi
+  printf '\e[H'
+  local i=0 n=${#SCR[@]}
+  while [ "$i" -lt "$n" ]; do
+    if [ $((i+1)) -lt "$n" ]; then printf '%s\e[K\n' "${SCR[$i]}"
+    else printf '%s\e[K' "${SCR[$i]}"; fi
+    i=$((i+1))
+  done
+  printf '\e[J'
+  if [ -n "$CURSOR" ]; then printf '\e[%sH\e[?25h' "$CURSOR"
+  else printf '\e[?25l'; fi
+}
+
+# ---------- frame builders ----------
+frame_open(){ local t r
+  t=$(trunc "$1" $((COLS-14)))
+  r=$((COLS-7-${#t})); [ "$r" -lt 1 ] && r=1
+  scr "$DG$GTL$GH$RST $AQUA$DIA$RST${2:-$B$TEAL} $t$RST $DG$(hrule $r)$GTR$RST"; }
+frame_blank(){ scr "$DG$GV$RST$(printf '%*s' $((COLS-2)) '')$DG$GV$RST"; }
+frame_div(){ scr "$DG$GDL$(hrule $((COLS-2)))$GDR$RST"; }
+frame_close(){ scr "$DG$GBL$(hrule $((COLS-2)))$GBR$RST"; }
+line_in(){ local pad=$((COLS-4-$2)); [ "$pad" -lt 1 ] && pad=1
+  scr "$DG$GV$RST  $1$RST$(printf '%*s' "$pad" '')$DG$GV$RST"; }
+frow(){ local k v
+  k=$(printf '%-8s' "$1"); v=$(trunc "$2" $((COLS-20)))
+  line_in "$GRAY$k$RST ${3:-$INK}$v$RST" "$((9+${#v}))"; }
+ftext(){ local t ind pad
+  ind=${3:-2}
+  t=$(trunc "$1" $((COLS-6-ind)))
+  pad=$((COLS-2-ind-${#t})); [ "$pad" -lt 1 ] && pad=1
+  scr "$DG$GV$RST$(printf '%*s' "$ind" '')${2:-$GRAY}$t$RST$(printf '%*s' "$pad" '')$DG$GV$RST"; }
+cell(){ local lbl; lbl=$(printf '%-7s' "$2")
+  printf '%s%s%s %s%s%s' "$B$AQUA" "$1" "$RST" "$GRAY" "$lbl" "$RST"; }
+leg(){ local c1 c2 c3 P
+  c1=$(cell "$1" "$2"); c2=$(cell "$3" "$4"); c3=''
+  P="$1 $(printf '%-7s' "$2")  $3 $(printf '%-7s' "$4")"
+  if [ -n "${5:-}" ]; then c3=$(cell "$5" "$6"); P="$P  $5 $(printf '%-7s' "$6")"; fi
+  line_in "$c1  $c2${c3:+  $c3}$RST" "${#P}"; }
+hdr(){ scr ''; scr "  $AQUA$DIA$RST ${B}ar0x sherlock${RST}${DG} v$VERSION $DOT $1${RST}"; scr ''; }
+
+# mixed-color row builder: seg <text> <color> ... then emit_row
+PB=''; CB=''
+seg(){ PB="$PB$1"; CB="$CB$2$1$RST"; }
+emit_row(){
+  if [ "${#PB}" -gt $((COLS-8)) ]; then ftext "$(trunc "$PB" $((COLS-8)))" "$GRAY"
+  else line_in "$CB" "${#PB}"; fi
+  PB=''; CB=''; }
+
+# ---------- THE GRID · live site status map ----------
+# no associative arrays here — old bash + set -u treats a declared-but-
+# empty assoc array as unbound and crashes. two parallel indexed arrays
+# and in-process string matching instead.
+grid_load(){
+  local res nm st entry i n
+  res=$(cat "$RESF" 2>/dev/null)
+  GORDER=(); GST=()
+  GCOLS=$(( (COLS-8)/13 )); [ "$GCOLS" -lt 1 ] && GCOLS=1
+  local -a TN=() TS=()
+  for entry in ${SITES[@]+"${SITES[@]}"}; do
+    nm=${entry%%|*}
+    st=P
+    case "$res" in
+      *"FOUND|$nm|"*) st=FOUND ;;
+      *"NO|$nm|"*)    st=NO ;;
+      *"ERR|$nm|"*)   st=ERR ;;
+    esac
+    TN+=("$nm"); TS+=("$st")
+  done
+  # display order: found first, then in-flight, then miss, then blocked
+  n=${#TN[@]}
+  for ((i=0;i<n;i++)); do [ "${TS[$i]}" = FOUND ] && { GORDER+=("${TN[$i]}"); GST+=(FOUND); }; done
+  for ((i=0;i<n;i++)); do [ "${TS[$i]}" = P ]     && { GORDER+=("${TN[$i]}"); GST+=(P); }; done
+  for ((i=0;i<n;i++)); do [ "${TS[$i]}" = NO ]    && { GORDER+=("${TN[$i]}"); GST+=(NO); }; done
+  for ((i=0;i<n;i++)); do [ "${TS[$i]}" = ERR ]   && { GORDER+=("${TN[$i]}"); GST+=(ERR); }; done
+  return 0
+}
+
+grid_render(){ # $1 rows visible  $2 pulse frame  $3 start index (for scrolling)
+  local rows=$1 fr=$2 start=$3 r c idx name g col line cnt
+  for (( r=0; r<rows; r++ )); do
+    line=''; cnt=0
+    for (( c=0; c<GCOLS; c++ )); do
+      idx=$(( start + r*GCOLS + c ))
+      [ "$idx" -ge "${#GORDER[@]}" ] && break
+      name=${GORDER[$idx]}
+      case "${GST[$idx]}" in
+        FOUND) g=$GF
+               if [ $(( fr % 2 )) -eq 0 ]; then col="$B$AQUA"; else col="$TEAL"; fi ;;
+        NO)    g=$GM; col="$DG" ;;
+        ERR)   g=$XGL; col="$RED" ;;
+        *)     g=$GP; col="$DG" ;;
+      esac
+      line="$line$col$g $(printf '%-10s' "$(trunc "$name" 10)")$RST "
+      cnt=$((cnt+1))
+    done
+    [ "$cnt" -gt 0 ] && line_in "$line" "$(( cnt*13 ))"
+  done
+  return 0
+}
+
+# full-screen scrollable sweep grid (g on the results screen)
+grid_view(){
+  local OFF=0 rows totalg maxoff
+  while :; do
+    grid_load
+    totalg=${#GORDER[@]}
+    rows=$(( LINES - 14 ))
+    [ "$rows" -lt 2 ] && rows=2
+    [ "$rows" -gt 16 ] && rows=16
+    maxoff=$(( (totalg + GCOLS - 1) / GCOLS - rows ))
+    [ "$maxoff" -lt 0 ] && maxoff=0
+    [ "$OFF" -gt "$maxoff" ] && OFF=$maxoff
+    [ "$OFF" -lt 0 ] && OFF=0
+    SCR=(); CURSOR=''
+    hdr "the sweep $DOT $UNAME"
+    frame_open 'THE GRID'
+    frame_blank
+    frow 'target' "$UNAME" "$B$AQUA"
+    frame_blank
+    grid_render "$rows" 0 $(( OFF*GCOLS ))
+    frame_blank
+    ftext "$GF found  $DOT  $XGL blocked  $DOT  $GM miss  $DOT  $GP never resolved" "$DG"
+    frame_close
+    scr ''
+    scr "  $D↑↓ scroll $DOT any other key goes back$RST"
+    draw
+    read_key || return 0
+    case "$KEY" in
+      UP|k|K)   OFF=$((OFF-1)); [ "$OFF" -lt 0 ] && OFF=0 ;;
+      DOWN|j|J) OFF=$((OFF+1)); [ "$OFF" -gt "$maxoff" ] && OFF=$maxoff ;;
+      *)        return 0 ;;
+    esac
+  done
+}
+
+# ---------- key reader ----------
+read_key(){
+  local k k2 k3
+  KEY=''
+  IFS= read -rsn1 k || return 1
+  if [ "$k" = $'\e' ]; then
+    IFS= read -rsn1 -t 0.05 k2 2>/dev/null || k2=''
+    if [ "$k2" = '[' ]; then
+      IFS= read -rsn1 -t 0.05 k3 2>/dev/null || k3=''
+      case "$k3" in A) KEY=UP;; B) KEY=DOWN;; *) KEY=ESC;; esac
+    else KEY=ESC; fi
+  else KEY=$k; fi
+  return 0
+}
+
+# ---------- banner ----------
+banner_lines(){
+  local i p tg mt r
+  local -a grad=("$G1" "$G2" "$G3" "$G4" "$G5" "$G6")
+  scr ''
+  p=$(( (COLS-19)/2 )); [ "$p" -lt 0 ] && p=0
+  scr "$(printf '%*s' "$p" '')$DG$(hrule 8)$RST$AQUA $DIA $RST$DG$(hrule 8)$RST"
+  scr ''
+  if [ "$AART" -eq 1 ]; then
+    p=$(( (COLS-31)/2 )); [ "$p" -lt 0 ] && p=0
+    for i in 0 1 2 3 4 5; do
+      scr "$(printf '%*s' "$p" '')${grad[$i]}${ART[$i]}$RST"
+    done
+    scr ''
+    if [ "$SART" -eq 1 ]; then
+      local -a LS=(' ██████' '█      ' '█      ' ' █████ ' '      █' '██████ ')
+      local -a LH=('█     █' '█     █' '█     █' '███████' '█     █' '█     █')
+      local -a LE=('███████' '█      ' '█      ' '██████ ' '█      ' '███████')
+      local -a LR=('██████ ' '█     █' '█     █' '██████ ' '█   ██ ' '█    █ ')
+      local -a LL=('█      ' '█      ' '█      ' '█      ' '█      ' '███████')
+      local -a LO=(' █████ ' '█     █' '█     █' '█     █' '█     █' ' █████ ')
+      local -a LC=(' ██████' '█      ' '█      ' '█      ' '█      ' ' ██████')
+      local -a LK=('█     █' '█    █ ' '█   █  ' '███    ' '█   █  ' '█    █ ')
+      p=$(( (COLS-63)/2 )); [ "$p" -lt 0 ] && p=0
+      for r in 0 1 2 3 4 5; do
+        scr "$(printf '%*s' "$p" '')${grad[$r]}${LS[$r]} ${LH[$r]} ${LE[$r]} ${LR[$r]} ${LL[$r]} ${LO[$r]} ${LC[$r]} ${LK[$r]}$RST"
+      done
+    else
+      p=$(( (COLS-29)/2 )); [ "$p" -lt 0 ] && p=0
+      scr "$(printf '%*s' "$p" '')$B$TEAL"'S   H   E   R   L   O   C   K'"$RST"
+    fi
+  else
+    p=$(( (COLS-15)/2 )); [ "$p" -lt 0 ] && p=0
+    scr "$(printf '%*s' "$p" '')$B$AQUA"'AR0X'"$RST$DG $DOT $RST$B$TEAL"'SHERLOCK'"$RST"
+  fi
+  scr ''
+  tg="one name $DOT every site $DOT found or not"
+  p=$(( (COLS-${#tg})/2 )); [ "$p" -lt 0 ] && p=0
+  scr "$(printf '%*s' "$p" '')$GRAY$tg$RST"
+  mt="v$VERSION $DOT crafted by ar0x $DOT github.com/ar0x1"
+  p=$(( (COLS-${#mt})/2 )); [ "$p" -lt 0 ] && p=0
+  scr "$(printf '%*s' "$p" '')$DG v$VERSION $DOT crafted by $RST$B$TEAL"'ar0x'"$RST$DG $DOT github.com/ar0x1$RST"
+  scr ''
+}
+
+# ---------- chrome ----------
+need_curl(){
+  command -v curl >/dev/null 2>&1 && return 0
+  SCR=(); CURSOR=''
+  hdr 'cannot continue'
+  frame_open 'CURL NOT FOUND' "$B$RED"
+  frame_blank
+  frow 'needed' "curl $DASH preinstalled nearly everywhere"
+  frame_blank
+  frow 'debian' 'sudo apt install curl'
+  frow 'fedora' 'sudo dnf install curl'
+  frow 'arch'   'sudo pacman -S curl'
+  frow 'suse'   'sudo zypper install curl'
+  frame_blank
+  frame_close
+  draw
+  exit 1
+}
+load_last(){
+  LAST_USER=''
+  [ -f "$AX_HISTORY" ] && LAST_USER=$(tail -n 1 "$AX_HISTORY" | cut -f2)
+}
+show_err(){
+  SCR=(); CURSOR=''
+  hdr 'hold on'
+  frame_open 'HOLD ON' "$B$RED"
+  frame_blank
+  ftext "$XGL  $1" "$RED"
+  frame_blank
+  frame_close
+  draw
+  sleep 1.3
+}
+usage(){ cat <<EOF
+ar0x sherlock $VERSION — find a username across the social web
+
+usage:
+  ar0xsherlock                interactive (recommended)
+  ar0xsherlock someuser       start with a name prefilled
+
+checks $TOTAL popular sites in parallel, streams every verdict live
+into THE GRID, lists every profile it finds, opens any of them in
+your browser, and writes a report to ~/Downloads.
+
+needs bash 4+ and curl. respects NO_COLOR. pure ASCII fallback.
+
+crafted by ar0x — killtoneizuku@gmail.com — github.com/ar0x1
+in the spirit of the sherlock project.
+EOF
+}
+
+# ---------- step 1 · the username ----------
+ask_username(){
+  local input pv
+  while :; do
+    SCR=(); CURSOR=''
+    banner_lines
+    frame_open 'USERNAME TO HUNT'
+    frame_blank
+    if [ -n "$LAST_USER" ]; then
+      ftext "last hunt: $LAST_USER $DASH enter repeats it" "$DG"
+      frame_blank
+    fi
+    pv="$GV  $TRI "
+    scr_cursor "$(( ${#SCR[@]} + 1 ))" "$(( ${#pv} + 1 ))"
+    scr "$DG$GV$RST  $AQUA$TRI$RST "
+    frame_blank
+    frame_close
+    scr ''
+    scr "  $D$(trunc 'letters, numbers, dots, _ and - · 2 to 32 chars' $((COLS-4)))$RST"
+    draw
+    IFS= read -r input || { printf '\e[?25h\n'; exit 0; }
+    printf '\e[?25l'
+    [ -z "$input" ] && [ -n "$LAST_USER" ] && input="$LAST_USER"
+    if [[ "$input" =~ ^[A-Za-z0-9._-]{2,32}$ ]]; then
+      UNAME=$input
+      return 0
+    fi
+    SCR=(); CURSOR=''
+    banner_lines
+    frame_open 'USERNAME TO HUNT'
+    frame_blank
+    ftext "$XGL  usernames are 2-32 chars: a-z 0-9 . _ -" "$RED"
+    frame_blank
+    frame_close
+    draw
+    sleep 1.1
+  done
+}
+
+# ---------- one site check (runs in background) ----------
+check_one(){
+  local name=$1 url=$2 mode=$3 param=$4 code body
+  url=${url//'{u}'/$UNAME}
+  if [ "$mode" = C ]; then
+    code=$(curl -A "$UA" -s -o /dev/null -m "$TMO" -w '%{http_code}' -L "$url")
+    case "$code" in
+      200) printf 'FOUND|%s|%s\n' "$name" "$url" >>"$RESF" ;;
+      404) printf 'NO|%s|%s\n'    "$name" "$url" >>"$RESF" ;;
+      *)   printf 'ERR|%s|%s\n'   "$name" "$url" >>"$RESF" ;;
+    esac
+  else
+    if body=$(curl -A "$UA" -s -m "$TMO" -L "$url"); then
+      if printf '%s' "$body" | grep -qiF "$param"; then
+        printf 'NO|%s|%s\n' "$name" "$url" >>"$RESF"
+      else
+        printf 'FOUND|%s|%s\n' "$name" "$url" >>"$RESF"
+      fi
+    else
+      printf 'ERR|%s|%s\n' "$name" "$url" >>"$RESF"
+    fi
+  fi
+}
+
+# ---------- live scan screen ----------
+draw_scan(){ # $1 spinner frame
+  local fr=$1 found no err done_ pct i fill barC
+  grid_load
+  found=$(grep -c '^FOUND|' "$RESF" 2>/dev/null); found=${found:-0}
+  no=$(grep -c '^NO|' "$RESF" 2>/dev/null);       no=${no:-0}
+  err=$(grep -c '^ERR|' "$RESF" 2>/dev/null);     err=${err:-0}
+  done_=$((found+no+err))
+  pct=$(( done_*100/TOTAL ))
+  SCR=(); CURSOR=''
+  hdr "hunting $UNAME on $TOTAL sites"
+  frame_open "HUNTING $DOT $UNAME"
+  frame_blank
+  PB=''; CB=''
+  seg "${SPIN[$fr]}  " "$B$AQUA"
+  seg "checked $done_/$TOTAL" "$B$INK"
+  seg "   $DOT   " "$DG"
+  seg "found $found" "$AQUA"
+  seg "   $DOT   " "$DG"
+  seg "miss $no" "$GRAY"
+  seg "   $DOT   " "$DG"
+  seg "blocked $err" "$DG"
+  seg "   $DOT   " "$DG"
+  seg "$(mmss "$SECONDS")" "$GRAY"
+  emit_row
+  frame_blank
+  local -a LV=()
+  mapfile -t LV < <(tail -n 3 "$RESF" 2>/dev/null)
+  local l st nm col msg
+  for l in ${LV[@]+"${LV[@]}"}; do
+    st=${l%%|*}
+    nm=$(printf '%s' "$l" | cut -d'|' -f2)
+    case "$st" in
+      FOUND) col=$AQUA; msg='found' ;;
+      NO)    col=$GRAY; msg='no trace' ;;
+      *)     col=$RED;  msg='blocked' ;;
+    esac
+    nm=$(trunc "$nm" $((COLS-18)))
+    PB=''; CB=''
+    seg "$ARR " "$DG"
+    seg "$nm" "$col"
+    seg "  $DASH  $msg" "$GRAY"
+    emit_row
+  done
+  [ "${#LV[@]}" -eq 0 ] && ftext "the first checks are in flight$ELL" "$DG"
+  frame_blank
+  fill=$(( done_*BARW/TOTAL )); [ "$fill" -gt "$BARW" ] && fill=$BARW
+  barC=''
+  for ((i=0;i<fill;i++)); do barC="$barC$AQUA$BARF"; done
+  for ((i=fill;i<BARW;i++)); do barC="$barC$DG$BARE"; done
+  line_in "$barC$RST  $GRAY$pct%$RST" "$((BARW+3+${#pct}))"
+  frame_blank
+  local -a FN=()
+  mapfile -t FN < <(grep '^FOUND|' "$RESF" 2>/dev/null | cut -d'|' -f2 | tail -n 5)
+  if [ "${#FN[@]}" -gt 0 ]; then
+    local joined IFS=' · '
+    joined="${FN[*]}"
+    joined=$(trunc "$joined" $((COLS-22)))
+    PB=''; CB=''
+    seg 'found so far   ' "$DG"
+    seg "$joined" "$AQUA"
+    emit_row
+  else
+    ftext "nothing confirmed yet $DASH the checks are in flight" "$DG"
+  fi
+  frame_blank
+  if [ "$INTR" -eq 1 ]; then
+    ftext "interrupted $DASH partial results are kept" "$RED"
+  else
+    ftext "ctrl+c stops the hunt $DASH partial results are kept" "$DG"
+  fi
+  frame_close
+
+  # ---- THE GRID · every site, live status, fills the rest of the screen ----
+  local avail=$(( LINES - ${#SCR[@]} - 4 ))
+  if [ "$avail" -ge 2 ]; then
+    scr ''
+    frame_open 'THE GRID'
+    grid_render "$avail" "$fr" 0
+    local totalg=${#GORDER[@]} vis=$(( avail * GCOLS )) more=''
+    [ "$vis" -lt "$totalg" ] && more="  $DOT  $ELL$(( totalg - vis )) below"
+    ftext "$GF found  $DOT  $XGL blocked  $DOT  $GM miss  $DOT  $GP in flight$more" "$DG"
+    frame_close
+  fi
+  draw
+}
+
+scan(){
+  local entry n u m p fr=0
+  SECONDS=0
+  INTR=0
+  : >"$RESF"
+  SCANNING=1
+  for entry in "${SITES[@]}"; do
+    [ "$INTR" -eq 1 ] && break
+    IFS='|' read -r n u m p <<<"$entry"
+    while [ "$(jobs -rp | wc -l)" -ge "$MAXJ" ]; do
+      draw_scan "$fr"; fr=$(( (fr+1)%${#SPIN[@]} ))
+      BSTATE=$(( (BSTATE+1)%BARW ))
+      sleep 0.12
+      [ "$INTR" -eq 1 ] && break
+    done
+    [ "$INTR" -eq 1 ] && break
+    check_one "$n" "$u" "$m" "$p" &
+    draw_scan "$fr"; fr=$(( (fr+1)%${#SPIN[@]} ))
+  done
+  while [ "$(jobs -rp | wc -l)" -gt 0 ] && [ "$INTR" -eq 0 ]; do
+    draw_scan "$fr"; fr=$(( (fr+1)%${#SPIN[@]} ))
+    BSTATE=$(( (BSTATE+1)%BARW ))
+    sleep 0.12
+  done
+  if [ "$INTR" -eq 1 ]; then
+    jobs -p 2>/dev/null | while IFS= read -r pid; do kill "$pid" 2>/dev/null; done
+    sleep 0.2
+  fi
+  SCANNING=0
+}
+
+# ---------- results ----------
+open_url(){
+  if command -v xdg-open >/dev/null 2>&1; then
+    ( xdg-open "$1" >/dev/null 2>&1 ) &
+  else
+    show_err 'no xdg-open here — the url is shown under the list'
+  fi
+}
+
+save_report(){
+  local out dir="$HOME/Downloads" nf nn ne
+  mkdir -p "$dir" 2>/dev/null || dir=$PWD
+  out="$dir/sherlock-$UNAME-$(date +%Y%m%d-%H%M).txt"
+  nf=$(grep -c '^FOUND|' "$RESF" 2>/dev/null); nf=${nf:-0}
+  nn=$(grep -c '^NO|' "$RESF" 2>/dev/null);    nn=${nn:-0}
+  ne=$(grep -c '^ERR|' "$RESF" 2>/dev/null);   ne=${ne:-0}
+  {
+    printf 'ar0x sherlock report\n'
+    printf 'date      %s\n' "$(date '+%Y-%m-%d %H:%M')"
+    printf 'username  %s\n' "$UNAME"
+    printf 'checked   %s sites\n\n' "$TOTAL"
+    printf 'FOUND (%s)\n' "$nf"
+    grep '^FOUND|' "$RESF" | sort -t'|' -k2,2 | while IFS='|' read -r _ nm ur; do
+      printf '  %-16s %s\n' "$nm" "$ur"
+    done
+    printf '\nNO TRACE (%s)\n' "$nn"
+    grep '^NO|' "$RESF" | cut -d'|' -f2 | while IFS= read -r nm; do printf '  %s\n' "$nm"; done
+    printf '\nBLOCKED / UNKNOWN (%s)\n' "$ne"
+    grep '^ERR|' "$RESF" | cut -d'|' -f2 | while IFS= read -r nm; do printf '  %s\n' "$nm"; done
+    printf '\ngenerated by ar0x sherlock v%s — github.com/ar0x1\n' "$VERSION"
+  } >"$out" 2>/dev/null
+  SCR=(); CURSOR=''
+  hdr 'report written'
+  frame_open 'REPORT SAVED'
+  frame_blank
+  frow 'wrote' "$(trunc "$out" $((COLS-20)))" "$AQUA"
+  frow 'holds' 'found · clean · blocked'
+  frame_blank
+  ftext 'press any key to go back' "$DG"
+  frame_close
+  draw
+  read_key || true
+}
+
+results_browse(){
+  local -a FL_=() NL_=() EL_=()
+  mapfile -t FL_ < <(grep '^FOUND|' "$RESF" 2>/dev/null | sort -t'|' -k2,2)
+  mapfile -t NL_ < <(grep '^NO|' "$RESF" 2>/dev/null | cut -d'|' -f2)
+  mapfile -t EL_ < <(grep '^ERR|' "$RESF" 2>/dev/null | cut -d'|' -f2)
+  local nf=${#FL_[@]} nn=${#NL_[@]} ne=${#EL_[@]}
+  if [ "$nf" -eq 0 ]; then
+    SCR=(); CURSOR=''
+    hdr 'the hunt is over'
+    frame_open 'NO TRACES FOUND'
+    frame_blank
+    frow 'username' "$UNAME" "$B$AQUA"
+    frow 'checked' "$TOTAL sites"
+    frow 'found'   '0 profiles' "$AQUA"
+    [ "$INTR" -eq 1 ] && frow 'note' 'interrupted — partial results' "$RED"
+    frame_blank
+    ftext 'either the name is genuinely free, or it hides behind' "$GRAY"
+    ftext 'walls this hunt cannot climb (facebook, x, instagram)' "$GRAY"
+    frame_blank
+    ftext 'g the sweep grid  ·  n new hunt  ·  any other key exits' "$DG"
+    frame_close
+    draw
+    read_key || return 0
+    case "$KEY" in
+      g|G) grid_view ;;
+      n|N) return 1 ;;
+      *)   return 0 ;;
+    esac
+  fi
+  local SEL=0 OFF=0 PSZ=$(( LINES-17 )) i nm pfx col end selurl
+  [ "$PSZ" -lt 3 ] && PSZ=3
+  [ "$PSZ" -gt 12 ] && PSZ=12
+  while :; do
+    [ "$SEL" -ge "$nf" ] && SEL=$((nf-1))
+    [ "$SEL" -lt 0 ] && SEL=0
+    [ "$OFF" -gt $(( nf-PSZ )) ] && OFF=$(( nf-PSZ ))
+    [ "$OFF" -lt 0 ] && OFF=0
+    [ "$SEL" -lt "$OFF" ] && OFF=$SEL
+    [ "$SEL" -ge $(( OFF+PSZ )) ] && OFF=$(( SEL-PSZ+1 ))
+    SCR=(); CURSOR=''
+    hdr 'the hunt is over'
+    frame_open "FOUND $DOT ${nf} PROFILES"
+    frame_blank
+    frow 'username' "$UNAME" "$B$AQUA"
+    frow 'found'    "$nf profiles" "$AQUA"
+    frow 'miss'     "$nn clean"
+    frow 'blocked'  "$ne unknown"
+    [ "$INTR" -eq 1 ] && frow 'note' 'interrupted — partial results' "$RED"
+    frame_blank
+    frame_div
+    end=$(( OFF+PSZ )); [ "$end" -gt "$nf" ] && end=$nf
+    for (( i=OFF; i<end; i++ )); do
+      nm=$(printf '%s' "${FL_[$i]}" | cut -d'|' -f2)
+      nm=$(trunc "$nm" $((COLS-12)))
+      if [ "$i" -eq "$SEL" ]; then pfx="$AQUA$TRI$RST "; col=$B$INK
+      else pfx='  '; col=$GRAY; fi
+      line_in "$pfx$col$nm$RST" "$((2+${#nm}))"
+    done
+    [ "$nf" -gt "$end" ] && ftext "$ELL $(( nf-end )) more below" "$DG"
+    frame_blank
+    frame_div
+    selurl=$(printf '%s' "${FL_[$SEL]}" | cut -d'|' -f3)
+    ftext "$ARR $(trunc "$selurl" $((COLS-10)))" "$AQUA"
+    frame_blank
+    leg '↑↓' 'move' 'enter' 'open' 'g' 'grid'
+    leg s 'save' n 'new hunt' q 'quit'
+    frame_close
+    draw
+    read_key || return 0
+    case "$KEY" in
+      UP|k|K)   [ "$SEL" -gt 0 ] && SEL=$((SEL-1)) ;;
+      DOWN|j|J) [ "$SEL" -lt $((nf-1)) ] && SEL=$((SEL+1)) ;;
+      ''|o|O)   open_url "$selurl" ;;
+      g|G)      grid_view ;;
+      s|S)      save_report ;;
+      n|N)      return 1 ;;
+      q|Q)      return 0 ;;
+    esac
+  done
+}
+
+# ---------- goodbye ----------
+cline(){ local p=$(( (COLS-$2)/2 )); [ "$p" -lt 0 ] && p=0
+  printf '%*s%s\n' "$p" '' "$1"; }
+goodbye(){
+  printf '\e[?25h\n'
+  cline "$DG$(hrule 8)$RST$AQUA $DIA $RST$DG$(hrule 8)$RST" 19
+  printf '\n'
+  cline "$D$GRAY a name is a trail — follow it.$RST" 29
+  printf '\n'
+  cline "$DG crafted by $RST$B$TEAL ar0x$RST" 15
+  cline "$DG mail $DOT $RST$GRAY killtoneizuku@gmail.com$RST" 30
+  cline "$DG code $DOT $RST$GRAY github.com/ar0x1$RST" 23
+  printf '\n'
+  cline "$D in the spirit of the sherlock project$RST" 37
+  printf '\n'
+}
+
+# ---------- main ----------
+main(){
+  local pre='' rc
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--help)    usage; exit 0 ;;
+      -v|--version) printf 'ar0x sherlock %s\n' "$VERSION"; exit 0 ;;
+      -*)           printf 'unknown option: %s\n\n' "$1"; usage; exit 1 ;;
+      *)            pre="$1" ;;
+    esac
+    shift
+  done
+
+  RESF=$(mktemp /tmp/ar0xsherlock.XXXXXX 2>/dev/null) || RESF="/tmp/ar0xsherlock.$$"
+  trap 'printf "\e[?25h\e[0m\n"; rm -f "$RESF"' EXIT
+  on_int(){
+    if [ "${SCANNING:-0}" -eq 1 ]; then
+      INTR=1
+      jobs -p 2>/dev/null | while IFS= read -r pid; do kill "$pid" 2>/dev/null; done
+      printf '\e[?25h'
+    else
+      printf '\e[?25h'
+      printf '\n\n%s%s interrupted%s\n' "$RED" "$XGL" "$RST"
+      exit 130
+    fi
+  }
+  trap on_int INT TERM
+
+  need_curl
+  load_last
+  UNAME=''
+
+  if [ -n "$pre" ]; then
+    if [[ "$pre" =~ ^[A-Za-z0-9._-]{2,32}$ ]]; then UNAME=$pre
+    else printf '%s\n' "${RED}${XGL} '$pre' is not a valid username (a-z 0-9 . _ - , 2-32 chars)${RST}"; exit 1; fi
+  fi
+
+  while :; do
+    [ -z "$UNAME" ] && { ask_username || break; }
+    scan
+    mkdir -p "$AX_DIR" 2>/dev/null
+    printf '%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$UNAME" >>"$AX_HISTORY" 2>/dev/null
+    LAST_USER="$UNAME"
+    results_browse; rc=$?
+    [ "$rc" -eq 0 ] && break
+    UNAME=''
+  done
+
+  goodbye
+}
+main "$@"
