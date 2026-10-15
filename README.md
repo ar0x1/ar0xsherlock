@@ -38,15 +38,17 @@
 ### Quick Start
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlok/main/ar0xsherlock)
+curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlock/main/ar0xsherlock.txt -o ar0xsherlock
+chmod +x ar0xsherlock
+./ar0xsherlock
 ```
 OR
 
 Copy and paste the following commands into your terminal:
 
 ```bash
-git clone https://github.com/ar0x1/ar0xsherlok.git
-cd ar0xsherlok
+git clone https://github.com/ar0x1/ar0xsherlock.git
+cd ar0xsherlock
 ls -la
 ```
 
