@@ -1,196 +1,166 @@
-# ar0x sherlock
+# `ar0xsherlock`
 
 <p align="center">
-  <samp>ONE NAME. EVERY SITE. FOUND OR NOT.</samp>
+  <b>Hunt usernames. Discover profiles. Stay in the terminal.</b>
 </p>
 
-A lightweight username reconnaissance tool built with **Bash + cURL**. Search across ~75 social platforms and discover publicly accessible profiles from a single terminal interface.
+<p align="center">
+  A lightweight, terminal-based username OSINT tool built with Bash and cURL.
+</p>
 
-No Python. No package managers. No unnecessary dependencies.
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.1.1-00D4AA?style=flat-square" />
+  <img src="https://img.shields.io/badge/language-Bash-121212?style=flat-square&logo=gnubash&logoColor=white" />
+  <img src="https://img.shields.io/badge/engine-cURL-121212?style=flat-square&logo=curl&logoColor=white" />
+  <img src="https://img.shields.io/badge/platform-Linux-121212?style=flat-square&logo=linux&logoColor=white" />
+</p>
 
 ---
 
-## ◆ Features
+## ◈ Overview
 
-- **~75 platforms** — Check popular social networks, developer communities, gaming platforms, and more.
-- **Live hunt interface** — Animated banner, progress bar, counters, and real-time results.
-- **Interactive verdict grid** — Watch every platform resolve as the hunt progresses.
-- **Two detection methods** — HTTP status checks and page-content probes for platforms that return misleading status codes.
-- **Parallel scanning** — Run up to 12 checks concurrently.
-- **Profile navigation** — Browse discovered profiles and open them in your browser.
-- **Exportable reports** — Save results for later analysis.
-- **Persistent history** — Revisit your previous searches.
-- **Terminal-friendly** — SSH support, ASCII fallback, and `NO_COLOR` compatibility.
+**`ar0xsherlock`** is a command-line username discovery tool that checks a username across multiple websites and services.
 
-## ◆ Quick start
+Built for terminal lovers, it combines a clean interactive interface with concurrent HTTP requests to make public-profile discovery simple and efficient.
 
-### Requirements
+No heavy framework. No unnecessary dependencies. Just Bash, cURL, and the terminal.
 
+## ◈ Features
+
+- **Multi-site scanning** — Check usernames across dozens of websites.
+- **Concurrent requests** — Scan multiple services at once.
+- **Interactive terminal UI** — A colorful, organized scanning interface.
+- **Live results** — Watch the scan progress in real time.
+- **Profile links** — Identify matching public profiles.
+- **Lightweight** — Built with Bash and cURL.
+- **Simple usage** — Launch interactively or provide a username directly.
+
+## ◈ Preview
+
+```text
+       ▄▀█ █▀█ █▀█ ▀█▀ █ █ █▀█ █▀▀ █▀█ █   █▀█ █▀▀ █▀█
+       █▀█ █▀▄ █▄█  █  █▄█ █▀▄ ██▄ █▀▄ █▄▄ █▄█ █▄▄ █▀▄
+
+       ┌────────────────────────────────────────┐
+       │         ar0xsherlock  v1.1.1            │
+       │     Username Intelligence Scanner      │
+       └────────────────────────────────────────┘
+
+       [ + ] Target     : username
+       [ + ] Engine     : Bash + cURL
+       [ + ] Mode       : Multi-site scan
+
+       [ * ] Scanning public profiles...
+       [ + ] Profile found
+       [ - ] No profile detected
+```
+
+*Illustrative terminal preview; actual output may differ.*
+
+## ◈ Requirements
+
+- Linux or another Unix-like environment
 - Bash 4+
 - cURL
-- A terminal
+- An interactive terminal
+- Internet connection
 
-### Download and run
+## ◈ Installation
+
+Clone the repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlock/main/ar0xsherlock -o ar0xsherlock
+git clone https://github.com/YOUR_USERNAME/ar0xsherlock.git
+cd ar0xsherlock
+```
+
+Make the script executable:
+
+```bash
 chmod +x ar0xsherlock
+```
+
+Run it:
+
+```bash
 ./ar0xsherlock
 ```
 
-Already cloned the repository? Run the script directly:
+Replace `YOUR_USERNAME` with your actual GitHub username.
+
+## ◈ Usage
+
+**Interactive mode**
 
 ```bash
-chmod +x ar0xsherlock
 ./ar0xsherlock
 ```
 
-### Install as a command
+Launch the tool and enter the username when prompted.
+
+**Direct scan**
 
 ```bash
-mkdir -p ~/.local/bin
-mv ar0xsherlock ~/.local/bin/ar0xsherlock
+./ar0xsherlock username
 ```
 
-Ensure `~/.local/bin` is included in your `PATH`, then launch it from anywhere:
+Replace `username` with the public username you want to check.
+
+**Show help**
 
 ```bash
-ar0xsherlock
+./ar0xsherlock --help
 ```
 
-Start a hunt immediately:
+**Show version**
 
 ```bash
-ar0xsherlock someuser
+./ar0xsherlock --version
 ```
 
-## ◆ The grid
+## ◈ How It Works
 
-Every platform receives a live verdict while the scan runs.
+1. Accepts a target username.
+2. Builds profile URLs for supported websites.
+3. Sends HTTP requests using cURL.
+4. Processes responses to determine whether a profile appears to exist.
+5. Displays the results in the terminal.
 
-```text
-╭─ ◆ THE GRID ─────────────────────────────────────╮
-│                                                   │
-│  ✓ GitHub    ✓ Reddit    ✓ Steam     ○ TikTok     │
-│  ○ Twitch    – YouTube   – Medium    – Tumblr     │
-│  ✗ Pinterest – Flickr    – Vimeo     – Genius     │
-│                                                   │
-│  ✓ found · ✗ blocked · – miss · ○ in flight       │
-╰───────────────────────────────────────────────────╯
-```
+Results depend on each website's response behavior. Redirects, rate limits, network errors, login requirements, and changes to website layouts can affect detection accuracy.
 
-| Symbol | Verdict | Meaning |
-|:---:|---|---|
-| `✓` | Found | A matching profile was detected. |
-| `–` | Miss | The platform indicated that the profile was absent. |
-| `✗` | Blocked | The check failed or returned an inconclusive response. |
-| `○` | In flight | The check is still running. |
+## ◈ Compatibility
 
-Found profiles receive visual priority in the grid. Press `g` on the results screen to view the complete, scrollable grid with final verdicts for every checked platform.
+The tool is designed for Bash 4+ environments with cURL installed. Some websites may block automated requests or return ambiguous responses, so results should be verified when accuracy matters.
 
-*The grid above is a static illustration. Actual results depend on the username and each platform's response.*
+## ◈ Responsible Use
 
-## ◆ How the hunt works
+`ar0xsherlock` is intended for legitimate OSINT, username discovery, and public-profile research.
 
-ar0x sherlock uses two detection methods.
+- Respect website terms of service.
+- Follow applicable laws and privacy rules.
+- Avoid harassment, unauthorized access, and misuse of discovered information.
+- Treat scan results as indicators, not guaranteed proof of identity.
 
-| Method | How it works | Typical use |
-|---|---|---|
-| `status` | Interprets HTTP status codes to determine whether a profile exists. | Most supported platforms |
-| `probe` | Fetches the page and checks its content for indicators that the profile does not exist. | Platforms that return similar status codes for existing and missing profiles |
+## ◈ Disclaimer
 
-Checks run concurrently, with a browser-like User-Agent and a 10-second timeout per request.
+This project is provided for educational and legitimate research purposes. The developer is not responsible for misuse of this tool or for decisions made based on its results.
 
-During the hunt, the interface displays:
+## ◈ Contributing
 
-- Live progress and a progress bar
-- Checked, found, missed, and blocked counters
-- A real-time verdict feed
-- Confirmed profiles as they are discovered
+Contributions, bug reports, and suggestions are welcome.
 
-When the hunt finishes, browse the discovered profiles using the keyboard, open them in your browser, or export the results to a report.
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes.
+4. Submit a pull request.
 
-## ◆ Keyboard controls
+## ◈ License
 
-| Key | Action |
-|---|---|
-| `Enter` | Start the hunt or open the selected profile |
-| `↑` / `↓` | Navigate through profiles or grid entries |
-| `j` / `k` | Navigate using Vim-style keys |
-| `g` | Open the full sweep grid |
-| `s` | Save the report |
-| `o` | Open the selected profile in your browser |
-| `n` | Start a new hunt |
-| `q` / `Esc` | Quit |
-| `Ctrl+C` | Stop the hunt; retain partial results where supported |
-
-Previous hunt history is stored in:
-
-```text
-~/.config/ar0xsherlock/
-```
-
-The interactive prompt can offer to repeat your previous hunt.
-
-Reports are saved by default under `~/Downloads`, using a filename similar to:
-
-```text
-sherlock-<name>-<date>.txt
-```
-
-## ◆ Command-line usage
-
-```bash
-ar0xsherlock                 # Interactive mode
-ar0xsherlock someuser        # Start with a username
-ar0xsherlock -h              # Display help
-ar0xsherlock -v              # Display version
-```
-
-## ◆ Scope & honesty
-
-ar0x sherlock checks approximately 75 supported platforms. Coverage depends on the configured site list and the availability of each platform.
-
-Some platforms, including Facebook, X, Instagram, and LinkedIn, are excluded because their anti-bot protections can prevent reliable username verification.
-
-**A blocked check is not a negative result.** HTTP errors, timeouts, rate limits, and unusual responses can prevent a reliable verdict.
-
-Likewise, a username that produces no matches is not necessarily available everywhere. A profile may be private, inaccessible, or hosted on an unsupported platform.
-
-The tool reports what it can establish instead of pretending every result is certain.
-
-> Built for research, username discovery, and checking your own digital footprint. Use it responsibly.
-
-## ◆ Compatibility
-
-| Requirement | Support |
-|---|---|
-| Shell | Bash 4+ |
-| HTTP client | cURL |
-| Linux | Supported |
-| SSH terminals | Supported |
-| Non-UTF-8 terminals | ASCII fallback |
-| `NO_COLOR` | Respected |
-
-The tool is designed to use only Bash and cURL, without Python or third-party package installations.
-
-## ◆ Changelog
-
-| Version | Changes |
-|---|---|
-| `1.0` | Initial hunt interface, terminal frames, and report support. |
-| `1.1` | Added the live verdict grid and full sweep view (`g`). |
-| `1.1.1` | Reworked the grid engine to avoid associative-array issues on Bash 4.2/4.3. |
-
-## ◆ Credits
-
-**Crafted by [ar0x](https://github.com/ar0x1)**, in the spirit of the original Sherlock project.
-
-- **GitHub:** [github.com/ar0x1](https://github.com/ar0x1)
-- **Email:** [killtoneizuku@gmail.com](mailto:killtoneizuku@gmail.com)
+Add your chosen license file and update this section accordingly.
 
 ---
 
 <p align="center">
-  <samp>A NAME IS A TRAIL — FOLLOW IT.</samp>
+  <b>ar0xsherlock</b><br>
+  <sub>Find the handle. Follow the public trail.</sub>
 </p>
