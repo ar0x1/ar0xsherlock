@@ -37,6 +37,11 @@
 
 ### Quick Start
 
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ar0x1/ar0xsherlok/main/ar0xsherlock)
+```
+OR
+
 Copy and paste the following commands into your terminal:
 
 ```bash
