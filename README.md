@@ -35,28 +35,6 @@ No heavy framework. No unnecessary dependencies. Just Bash, cURL, and the termin
 - **Lightweight** — Built with Bash and cURL.
 - **Simple usage** — Launch interactively or provide a username directly.
 
-## ◈ Preview
-
-```text
-       ▄▀█ █▀█ █▀█ ▀█▀ █ █ █▀█ █▀▀ █▀█ █   █▀█ █▀▀ █▀█
-       █▀█ █▀▄ █▄█  █  █▄█ █▀▄ ██▄ █▀▄ █▄▄ █▄█ █▄▄ █▀▄
-
-       ┌────────────────────────────────────────┐
-       │         ar0xsherlock  v1.1.1            │
-       │     Username Intelligence Scanner      │
-       └────────────────────────────────────────┘
-
-       [ + ] Target     : username
-       [ + ] Engine     : Bash + cURL
-       [ + ] Mode       : Multi-site scan
-
-       [ * ] Scanning public profiles...
-       [ + ] Profile found
-       [ - ] No profile detected
-```
-
-*Illustrative terminal preview; actual output may differ.*
-
 ## ◈ Requirements
 
 - Linux or another Unix-like environment
