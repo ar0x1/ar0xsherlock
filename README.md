@@ -1,11 +1,11 @@
 # `ar0xsherlock`
 
 <p align="center">
-  <b>Hunt usernames. Discover profiles. Stay in the terminal.</b>
+  <b>Hunt usernames. Follow the public trail.</b>
 </p>
 
 <p align="center">
-  A lightweight, terminal-based username OSINT tool built with Bash and cURL.
+  A lightweight username OSINT tool built with Bash and cURL.
 </p>
 
 <p align="center">
@@ -19,52 +19,41 @@
 
 ## ◈ Overview
 
-**`ar0xsherlock`** is a command-line username discovery tool that checks a username across multiple websites and services.
+**ar0xsherlock** is a terminal-based username discovery tool that checks usernames across multiple websites and services.
 
-Built for terminal lovers, it combines a clean interactive interface with concurrent HTTP requests to make public-profile discovery simple and efficient.
-
-No heavy framework. No unnecessary dependencies. Just Bash, cURL, and the terminal.
+Built with Bash and cURL, it combines concurrent HTTP requests with an interactive terminal interface to make public-profile discovery simple and efficient.
 
 ## ◈ Features
 
-- **Multi-site scanning** — Check usernames across dozens of websites.
-- **Concurrent requests** — Scan multiple services at once.
-- **Interactive terminal UI** — A colorful, organized scanning interface.
-- **Live results** — Watch the scan progress in real time.
-- **Profile links** — Identify matching public profiles.
-- **Lightweight** — Built with Bash and cURL.
-- **Simple usage** — Launch interactively or provide a username directly.
-
-## ◈ Requirements
-
-- Linux or another Unix-like environment
-- Bash 4+
-- cURL
-- An interactive terminal
-- Internet connection
+- **Multi-site scanning** — Check usernames across supported websites.
+- **Concurrent requests** — Scan multiple services simultaneously.
+- **Interactive terminal UI** — A clean, colorful CLI experience.
+- **Live results** — Follow scan progress directly in your terminal.
+- **Lightweight** — Powered by Bash and cURL.
+- **Quick launch** — Install and run with a single command.
 
 ## ◈ Installation
 
-Clone the repository:
+### Quick Install
+
+Copy and paste this command into your terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ar0xsherlock/main/ar0xsherlock -o ar0xsherlock && chmod +x ar0xsherlock && ./ar0xsherlock
+```
+
+This downloads the script, makes it executable, and launches the tool.
+
+**Note:** Replace `YOUR_USERNAME` with your GitHub username. This command assumes the script is named `ar0xsherlock` and is located in the repository's `main` branch root.
+
+### Manual Installation
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/ar0xsherlock.git
 cd ar0xsherlock
-```
-
-Make the script executable:
-
-```bash
 chmod +x ar0xsherlock
-```
-
-Run it:
-
-```bash
 ./ar0xsherlock
 ```
-
-Replace `YOUR_USERNAME` with your actual GitHub username.
 
 ## ◈ Usage
 
@@ -74,15 +63,11 @@ Replace `YOUR_USERNAME` with your actual GitHub username.
 ./ar0xsherlock
 ```
 
-Launch the tool and enter the username when prompted.
-
-**Direct scan**
+**Search a specific username**
 
 ```bash
 ./ar0xsherlock username
 ```
-
-Replace `username` with the public username you want to check.
 
 **Show help**
 
@@ -96,32 +81,34 @@ Replace `username` with the public username you want to check.
 ./ar0xsherlock --version
 ```
 
+## ◈ Requirements
+
+- Linux or a compatible Unix-like environment
+- Bash 4+
+- cURL
+- Internet connection
+- Interactive terminal
+
 ## ◈ How It Works
 
 1. Accepts a target username.
-2. Builds profile URLs for supported websites.
-3. Sends HTTP requests using cURL.
-4. Processes responses to determine whether a profile appears to exist.
-5. Displays the results in the terminal.
+2. Checks supported websites using profile URLs.
+3. Sends HTTP requests through cURL.
+4. Processes responses and displays potential profile matches.
+5. Presents results directly in the terminal.
 
-Results depend on each website's response behavior. Redirects, rate limits, network errors, login requirements, and changes to website layouts can affect detection accuracy.
-
-## ◈ Compatibility
-
-The tool is designed for Bash 4+ environments with cURL installed. Some websites may block automated requests or return ambiguous responses, so results should be verified when accuracy matters.
+Detection accuracy depends on website response behavior, redirects, rate limits, and network conditions. Results should be independently verified when necessary.
 
 ## ◈ Responsible Use
 
-`ar0xsherlock` is intended for legitimate OSINT, username discovery, and public-profile research.
-
-- Respect website terms of service.
-- Follow applicable laws and privacy rules.
-- Avoid harassment, unauthorized access, and misuse of discovered information.
-- Treat scan results as indicators, not guaranteed proof of identity.
+- Use the tool for legitimate OSINT and public-profile research.
+- Respect website terms of service and privacy.
+- Follow applicable laws.
+- Do not use discovered information to harass or harm others.
 
 ## ◈ Disclaimer
 
-This project is provided for educational and legitimate research purposes. The developer is not responsible for misuse of this tool or for decisions made based on its results.
+This tool is provided for educational and legitimate research purposes. The developer is not responsible for misuse or decisions made based on scan results.
 
 ## ◈ Contributing
 
@@ -134,7 +121,7 @@ Contributions, bug reports, and suggestions are welcome.
 
 ## ◈ License
 
-Add your chosen license file and update this section accordingly.
+Add your chosen license and include the corresponding `LICENSE` file in the repository.
 
 ---
 
